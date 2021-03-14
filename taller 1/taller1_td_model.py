@@ -5,7 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from random import random
 import tensorflow as tf
+import csv
 
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -15,11 +17,14 @@ from keras.models import Sequential
 nw_16_url = './data/NW2016.csv'
 nw_17_url = './data/NW2017.csv'
 nw_18_url = './data/NW2018.csv'
+
+print("Started data loading process")
+
 NW2016_dataset = pd.read_csv(nw_16_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
 NW2017_dataset = pd.read_csv(nw_17_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
 NW2018_dataset = pd.read_csv(nw_18_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
 
-print(NW2016_dataset.tail())
+print("Data loaded successfully")
 
 
 #DATASET PREPRoCESSING ---------------------------------------------------------------------------------------------------------------
@@ -61,10 +66,40 @@ dataset = normalize(dataset)
 # DATASET SEGMENTATION ------------------------------------------------------------------------------------------------------------------------
 
 TIMESTEP = '720T'
-resample_ds = dataset.resample(TIMESTEP).mean()
+HISTORY_LAG = 100
+FUTURE_TARGET = 50
+DENSE_NEURONS = 64
+LEARNING_RATE = 0.01
+NN_ARCHITECTURE = 0
+EPOCHS = [500, 1000, 2000, 4000, 6000]
 
-train_ds = resample_ds.sample(frac=0.7)
-test_ds = resample_ds.drop(train_ds.index)
+headers = ['ITERATION', 'TIMESTEP', 'HISTORY_LAG', 'DENSE_NEURONS', 'LEARNING_RATE', 'FUTURE_TARGET', 'TRANING_EPOCHS', 'NN_ARCHITECTURE', 'LOSS', 'MAE', 'MSE']
+report = []
+report.append(headers)
+
+#Defining two possible NN architectures
+def lstm_opc1(input):
+
+    lstm_model = tf.keras.models.Sequential([
+        tf.keras.layers.LSTM(HISTORY_LAG, input_shape=input.shape[-2:]),
+        tf.keras.layers.Dense(FUTURE_TARGET)
+    ])
+
+    lstm_model.compile(optimizer='adam', metrics=['mae', 'mse'], loss='mse')
+
+    return lstm_model
+
+def lstm_opc2(input):
+    lstm_model = tf.keras.models.Sequential([
+        tf.keras.layers.LSTM(HISTORY_LAG, input_shape=input.shape[-2:]),
+        tf.keras.layers.Dense(DENSE_NEURONS),
+        tf.keras.layers.Dense(FUTURE_TARGET)
+    ])
+
+    optimizer = tf.keras.optimizers.RMSprop(LEARNING_RATE)
+
+    lstm_model.compile(optimizer=optimizer, metrics=['mae', 'mse'], loss='mse')
+    return lstm_model
 
 def segment(dataset, variable, window = 5000, future = 0):
     data = []
@@ -79,82 +114,94 @@ def segment(dataset, variable, window = 5000, future = 0):
         labels.append(dataset[variable][end_index:future_index])
     return np.array(data), np.array(labels)
 
-HISTORY_LAG = 100
-FUTURE_TARGET = 50
+for x in EPOCHS:
+    iteration = 1
+    print("Iteracion ", iteration)
+    resample_ds = dataset.resample(TIMESTEP).mean()
 
-X_td_train, Y_td_train = segment(train_ds, "td", window = HISTORY_LAG, future = FUTURE_TARGET)
-X_td_train = X_td_train.reshape(X_td_train.shape[0], HISTORY_LAG, 1)
-Y_td_train = Y_td_train.reshape(Y_td_train.shape[0], FUTURE_TARGET, 1)
+    train_ds = resample_ds.sample(frac=0.7)
+    test_ds = resample_ds.drop(train_ds.index)
 
-print("Data shape: ", X_td_train.shape)
-print("Tags shape: ", Y_td_train.shape)
+    X_td_train, Y_td_train = segment(train_ds, "td", window = HISTORY_LAG, future = FUTURE_TARGET)
+    X_td_train = X_td_train.reshape(X_td_train.shape[0], HISTORY_LAG, 1)
+    Y_td_train = Y_td_train.reshape(Y_td_train.shape[0], FUTURE_TARGET, 1)
+
+    #print("Data shape: ", X_td_train.shape)
+    #print("Tags shape: ", Y_td_train.shape)
 
 
-X_td_test, Y_td_test = segment(test_ds, "td", window = HISTORY_LAG, future = FUTURE_TARGET)
+    X_td_test, Y_td_test = segment(test_ds, "td", window = HISTORY_LAG, future = FUTURE_TARGET)
 
-X_td_test = X_td_test.reshape(X_td_test.shape[0], HISTORY_LAG, 1)
-Y_td_test = Y_td_test.reshape(Y_td_test.shape[0], FUTURE_TARGET, 1)
+    X_td_test = X_td_test.reshape(X_td_test.shape[0], HISTORY_LAG, 1)
+    Y_td_test = Y_td_test.reshape(Y_td_test.shape[0], FUTURE_TARGET, 1)
 
-print("Data shape: ", X_td_test.shape)
-print("Tags shape: ", Y_td_test.shape)
+    #print("Data shape: ", X_td_test.shape)
+    #print("Tags shape: ", Y_td_test.shape)
 
-# MODEL TRAINING STAGE ------------------------------------------------------------------------------------------------------------------------
+    # MODEL TRAINING STAGE ------------------------------------------------------------------------------------------------------------------------
 
-EPOCHS = 200
+    lstm_model = None
 
-lstm_model = tf.keras.models.Sequential([
-    tf.keras.layers.LSTM(HISTORY_LAG, input_shape=X_td_train.shape[-2:]),
-    tf.keras.layers.Dense(FUTURE_TARGET)
-])
+    rnd = random()
+    
+    if(rnd <= 0.5):
+        NN_ARCHITECTURE = 1
+        lstm_model = lstm_opc1(X_td_train)
+    else:
+        NN_ARCHITECTURE = 2
+        lstm_model = lstm_opc2(X_td_train)
 
-lstm_model.compile(optimizer='adam', metrics=['mae', 'mse'], loss='mse')
+    #print('Now starting to train!')
+    tmstmp1 = time.time()
 
-print('Now starting to train!')
-tmstmp1 = time.time()
+    lstm_model.fit(X_td_train, Y_td_train, epochs=EPOCHS, verbose = 0)
 
-lstm_model.fit(X_td_train, Y_td_train, epochs=EPOCHS)
+    tmstmp2 = time.time()
+    print('Total time elapsed = ', tmstmp2 - tmstmp1)
 
-tmstmp2 = time.time()
-print('Total time elapsed = ', tmstmp2 - tmstmp1)
-
-# MODEL EVALUATION STAGE ------------------------------------------------------------------------------------------------------------------------
-loss, mae, mse = lstm_model.evaluate(X_td_train, Y_td_train, verbose=2)
-
+    # MODEL EVALUATION STAGE ------------------------------------------------------------------------------------------------------------------------
+    loss, mae, mse = lstm_model.evaluate(X_td_train, Y_td_train, verbose=2)
+    report.append([x, TIMESTEP, HISTORY_LAG, DENSE_NEURONS, LEARNING_RATE, FUTURE_TARGET, x, NN_ARCHITECTURE, loss, mae, mse])
+    iteration += 1
 # MODEL PREDICTION STAGE ------------------------------------------------------------------------------------------------------------------------
-predictions = lstm_model.predict(X_td_test, verbose = 0)
+#predictions = lstm_model.predict(X_td_test, verbose = 0)
 
-Y_td_test = Y_td_test.reshape(Y_td_test.shape[0], FUTURE_TARGET,)
+#Y_td_test = Y_td_test.reshape(Y_td_test.shape[0], FUTURE_TARGET,)
 
-predict_list = []
-test_list = []
+#predict_list = []
+#test_list = []
 
-for i in predictions:
-    predict_list.append(i[40])
+#for i in predictions:
+#    predict_list.append(i[40])
 
-pred_array = np.array(predict_list)
-print(pred_array.shape)
+#pred_array = np.array(predict_list)
+#print(pred_array.shape)
 
-for i in Y_td_test:
-    test_list.append(i[40])
+#for i in Y_td_test:
+#    test_list.append(i[40])
 
-val_narray = np.array(test_list)
-print(val_narray.shape)
+#val_narray = np.array(test_list)
+#print(val_narray.shape)
 
-a = plt.axes(aspect='equal')
-plt.scatter(val_narray, pred_array)
-plt.xlabel('True Values temperature')
-plt.ylabel('Predictions temperature')
-lims = [0, 50]
-plt.xlim(lims)
-plt.ylim(lims)
-_ = plt.plot(lims, lims)
+#a = plt.axes(aspect='equal')
+#plt.scatter(val_narray, pred_array)
+#plt.xlabel('True Values temperature')
+#plt.ylabel('Predictions temperature')
+#lims = [0, 50]
+#plt.xlim(lims)
+#plt.ylim(lims)
+#_ = plt.plot(lims, lims)
 
-plt.show()
+#plt.show()
 
-error = pred_array - val_narray
-print(error)
-plt.hist(error, bins = 25)
-plt.xlabel("Prediction Error temperature")
-_ = plt.ylabel("Count")
+#error = pred_array - val_narray
+#print(error)
+#plt.hist(error, bins = 25)
+#plt.xlabel("Prediction Error temperature")
+#_ = plt.ylabel("Count")
 
-plt.show()
+#plt.show()
+#Opening CSV file to save results
+with open('./reports/td_model_report.csv', mode = 'w') as td_results:
+    writer = csv.writer(td_results)
+    writer.writerows(report)

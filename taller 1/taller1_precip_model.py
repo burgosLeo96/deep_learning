@@ -69,10 +69,12 @@ HISTORY_LAG = 100
 DENSE_NEURONS = 64
 LEARNING_RATE = 0.01
 FUTURE_TARGET = 50
-EPOCHS = 200
+EPOCHS = [500, 1000, 2000, 4000, 6000]
 NN_ARCHITECTURE = 0
 
-report = ['ITERATION', 'TIMESTEP', 'HISTORY_LAG', 'DENSE_NEURONS', 'LEARNING_RATE', 'FUTURE_TARGET', 'TRANING_EPOCHS', 'NN_ARCHITECTURE', 'LOSS', 'MAE', 'MSE']
+headers = ['ITERATION', 'TIMESTEP', 'HISTORY_LAG', 'DENSE_NEURONS', 'LEARNING_RATE', 'FUTURE_TARGET', 'TRANING_EPOCHS', 'NN_ARCHITECTURE', 'LOSS', 'MAE', 'MSE']
+report = []
+report.append(headers)
 
 #Defining two possible NN architectures
 def lstm_opc1(input):
@@ -112,8 +114,9 @@ def segment(dataset, variable, window = 5000, future = 0):
         labels.append(dataset[variable][end_index:future_index])
     return np.array(data), np.array(labels)
 
-for x in range(10):
-    print("iteration ", x)
+for x in EPOCHS:
+    iteration = 1
+    print("iteration ", iteration)
     resample_ds = dataset.resample(TIMESTEP).mean()
 
     train_ds = resample_ds.sample(frac=0.7)
@@ -137,8 +140,6 @@ for x in range(10):
 
     # MODEL TRAINING STAGE ------------------------------------------------------------------------------------------------------------------------
 
-    #print('Now starting to train!')
-    tmstmp1 = time.time()
     lstm_model = None
 
     rnd = random()
@@ -150,15 +151,18 @@ for x in range(10):
         NN_ARCHITECTURE = 2
         lstm_model = lstm_opc2(X_precip_train)
 
-    lstm_model.fit(X_precip_train, Y_precip_train, epochs=EPOCHS)
+    #print('Now starting to train!')
+    tmstmp1 = time.time()
+
+    lstm_model.fit(X_precip_train, Y_precip_train, epochs=x, verbose = 0)
 
     tmstmp2 = time.time()
     print('Total time elapsed = ', tmstmp2 - tmstmp1)
 
     # MODEL EVALUATION STAGE ------------------------------------------------------------------------------------------------------------------------
     loss, mae, mse = lstm_model.evaluate(X_precip_train, Y_precip_train, verbose=2)
-    report.append([x, TIMESTEP, HISTORY_LAG, DENSE_NEURONS, LEARNING_RATE, FUTURE_TARGET, EPOCHS, NN_ARCHITECTURE, loss, mae, mse])
-
+    report.append([x, TIMESTEP, HISTORY_LAG, DENSE_NEURONS, LEARNING_RATE, FUTURE_TARGET, x, NN_ARCHITECTURE, loss, mae, mse])
+    iteration += 1
 # MODEL PREDICTION STAGE ------------------------------------------------------------------------------------------------------------------------
 #predictions = lstm_model.predict(X_precip_test, verbose = 0)
 
