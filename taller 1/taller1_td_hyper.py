@@ -15,7 +15,7 @@ from tensorflow.keras.models import Sequential
 from hyperas import optim
 from tensorflow.python.keras.layers.recurrent import LSTM
 from tensorflow.python.keras.layers import Input, Dense, Dropout, Activation
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from hyperas.distributions import choice, uniform
 from hyperopt import Trials, STATUS_OK, tpe
 from hyperas import optim
@@ -39,14 +39,14 @@ def data():
     HISTORY_LAG = 100
     FUTURE_TARGET = 50
     nw_16_url = './data/NW2016.csv'
-    nw_17_url = './data/NW2017.csv'
-    nw_18_url = './data/NW2018.csv'
+    #nw_17_url = './data/NW2017.csv'
+    #nw_18_url = './data/NW2018.csv'
 
     NW2016_dataset = pd.read_csv(nw_16_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
-    NW2017_dataset = pd.read_csv(nw_17_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
-    NW2018_dataset = pd.read_csv(nw_18_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
+    #NW2017_dataset = pd.read_csv(nw_17_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
+    #NW2018_dataset = pd.read_csv(nw_18_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
     
-    data = pd.concat([NW2016_dataset, NW2017_dataset, NW2018_dataset])
+    #data = pd.concat([NW2016_dataset, NW2017_dataset, NW2018_dataset])
     data = NW2016_dataset
     data = data[data.isna()['psl'] == False]
     #Drop useless columns
@@ -93,13 +93,13 @@ def model(X_train, X_test, y_train, y_test):
     model.add(Activation({{choice(['relu', 'sigmoid', 'tanh'])}}))
     model.compile(optimizer='adam',
                        metrics=['mae', 'mse'], loss='mse')
-    early_stopping = EarlyStopping(monitor='val_loss', patience=4)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=10)
     checkpointer = ModelCheckpoint(filepath='keras_weights.hdf5',
                                    verbose=1,
                                    save_best_only=True)
-    model.fit(X_train, y_train,
+    history = model.fit(X_train, y_train,
               batch_size={{choice([32, 64, 128])}},
-              epochs={{choice([100, 200, 500, 1000])}},
+              epochs=100,
               validation_split=0.08,
               callbacks=[early_stopping, checkpointer])
     
@@ -107,6 +107,32 @@ def model(X_train, X_test, y_train, y_test):
 
     print('Test mae:', mae)
     print('Test mse:', mse)
+    
+    print('History :', history.history.keys())
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
+    
+    plt.plot(history.history['mse'])
+    plt.plot(history.history['val_mse'])
+    plt.title('model mse')
+    plt.ylabel('mse')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
+    
+    plt.plot(history.history['mae'])
+    plt.plot(history.history['val_mae'])
+    plt.title('model mae')
+    plt.ylabel('mae')
+    plt.xlabel('epoch',history.history['epoch'])
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
+
     return {'loss': loss, 'status': STATUS_OK, 'model': model}
 
 
