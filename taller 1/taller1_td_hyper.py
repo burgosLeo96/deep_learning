@@ -21,6 +21,13 @@ from hyperopt import Trials, STATUS_OK, tpe
 from hyperas import optim
 
 from functions import segment, normalize
+#dd	Wind direction	degrees (°)
+#ff	Wind speed	m.s-1
+#precip	Precipitation during the reporting period	kg.m2
+#hu	Humidity	percentage (%)
+#td	Dew point	Kelvin (K)
+#t	Temperature	Kelvin (K)
+#psl	Pressure reduced to sea level	Pascal (Pa)
 
 DENSE_NEURONS = 64
 LEARNING_RATE = 0.01
@@ -32,14 +39,14 @@ def data():
     HISTORY_LAG = 100
     FUTURE_TARGET = 50
     nw_16_url = './data/NW2016.csv'
-    nw_17_url = './data/NW2017.csv'
-    nw_18_url = './data/NW2018.csv'
+    #nw_17_url = './data/NW2017.csv'
+    #nw_18_url = './data/NW2018.csv'
 
     NW2016_dataset = pd.read_csv(nw_16_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
-    NW2017_dataset = pd.read_csv(nw_17_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
-    NW2018_dataset = pd.read_csv(nw_18_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
+    #NW2017_dataset = pd.read_csv(nw_17_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
+    #NW2018_dataset = pd.read_csv(nw_18_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
     
-    data = pd.concat([NW2016_dataset, NW2017_dataset, NW2018_dataset])
+    #data = pd.concat([NW2016_dataset, NW2017_dataset, NW2018_dataset])
     data = NW2016_dataset
     data = data[data.isna()['psl'] == False]
     #Drop useless columns
@@ -54,7 +61,6 @@ def data():
     stats = data.describe()
     stats = stats.transpose()
     data = normalize(data, stats)
-    
     resample_ds = data.resample(TIMESTEP).mean()
 
     train_ds = resample_ds.sample(frac=0.7)
@@ -81,10 +87,10 @@ def data():
 def model(X_train, X_test, y_train, y_test):
 
     model = tf.keras.models.Sequential()
-    model.add(LSTM(units=200, input_shape=X_train.shape[-2:]))
-    model.add(Dropout(0.41))
+    model.add(LSTM(units={{choice([100, 200, 500])}}, input_shape=X_train.shape[-2:]))
+    model.add(Dropout({{uniform(0, 1)}}))
     model.add(Dense(1))
-    model.add(Activation('relu'))
+    model.add(Activation({{choice(['relu', 'sigmoid', 'tanh'])}}))
     model.compile(optimizer='adam',
                        metrics=['mae', 'mse'], loss='mse')
     early_stopping = EarlyStopping(monitor='val_loss', patience=4)
@@ -92,20 +98,24 @@ def model(X_train, X_test, y_train, y_test):
                                    verbose=1,
                                    save_best_only=True)
     model.fit(X_train, y_train,
-              batch_size=64,
-              epochs=200,
+              batch_size={{choice([32, 64, 128])}},
+              epochs={{choice([100, 200, 500, 1000])}},
               validation_split=0.08,
               callbacks=[early_stopping, checkpointer])
     
     loss, mae, mse  = model.evaluate(X_test, y_test, verbose=0)
 
-    print(' mae:', mae)
-    print(' mse:', mse)
-    print(' loss:', loss)
-    return model
+    print('Test mae:', mae)
+    print('Test mse:', mse)
+    return {'loss': loss, 'status': STATUS_OK, 'model': model}
 
 
 if __name__ == '__main__':
-    X_train, X_test, y_train, y_test = data()
-    lstm_model = model(X_train, X_test, y_train, y_test)
-    predictions = lstm_model.predict(X_test, verbose = 0)
+    best_run, best_model = optim.minimize(model=model,
+                                          data=data,
+                                          algo=tpe.suggest,
+                                          max_evals=10,
+                                          trials=Trials())
+    print(best_run)
+    print(best_model)
+   
