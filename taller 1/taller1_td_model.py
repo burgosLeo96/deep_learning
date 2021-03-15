@@ -86,9 +86,8 @@ def data():
 #Model the NN
 def model(X_train, X_test, y_train, y_test):
 
-    HISTORY_LAG = 100
     model = tf.keras.models.Sequential()
-    model.add(LSTM(HISTORY_LAG, input_shape=X_train.shape[-2:]))
+    model.add(LSTM(units={{choice([100, 200, 500])}}, input_shape=X_train.shape[-2:]))
     model.add(Dropout({{uniform(0, 1)}}))
     model.add(Dense(1))
     model.add(Activation({{choice(['relu', 'sigmoid', 'tanh'])}}))
@@ -98,13 +97,12 @@ def model(X_train, X_test, y_train, y_test):
     checkpointer = ModelCheckpoint(filepath='keras_weights.hdf5',
                                    verbose=1,
                                    save_best_only=True)
-    print('line 109: before fit')
     model.fit(X_train, y_train,
               batch_size={{choice([32, 64, 128])}},
-              epochs={{choice([100, 200, 500, 1000, 1500])}},
+              epochs={{choice([100, 200, 500, 1000])}},
               validation_split=0.08,
               callbacks=[early_stopping, checkpointer])
-    print('line 109: after fit')
+    
     loss, mae, mse  = model.evaluate(X_test, y_test, verbose=0)
 
     print('Test mae:', mae)
