@@ -91,7 +91,7 @@ def model(X_train, X_test, y_train, y_test):
     model.add(LSTM(HISTORY_LAG, input_shape=X_train.shape[-2:]))
     model.add(Dropout({{uniform(0, 1)}}))
     model.add(Dense(1))
-    model.add(Activation('relu'))
+    model.add(Activation({{choice(['relu', 'sigmoid', 'tanh'])}}))
     model.compile(optimizer='adam',
                        metrics=['mae', 'mse'], loss='mse')
     early_stopping = EarlyStopping(monitor='val_loss', patience=4)
@@ -101,7 +101,7 @@ def model(X_train, X_test, y_train, y_test):
     print('line 109: before fit')
     model.fit(X_train, y_train,
               batch_size={{choice([32, 64, 128])}},
-              epochs={{choice([100, 200, 500, 1000])}},
+              epochs={{choice([100, 200, 500, 1000, 1500])}},
               validation_split=0.08,
               callbacks=[early_stopping, checkpointer])
     print('line 109: after fit')
@@ -119,6 +119,7 @@ if __name__ == '__main__':
                                           max_evals=10,
                                           trials=Trials())
     print(best_run)
+    print(best_model)
     
 
 # MODEL PREDICTION STAGE ------------------------------------------------------------------------------------------------------------------------
