@@ -22,11 +22,10 @@ from hyperas import optim
 
 from functions import segment, normalize
 
-TIMESTEP = '720T'
-HISTORY_LAG = 100
-FUTURE_TARGET = 50
-
 def data():
+    TIMESTEP = '720T'
+    HISTORY_LAG = 100
+    FUTURE_TARGET = 50
     nw_16_url = './data/NW2016.csv'
     nw_17_url = './data/NW2017.csv'
     nw_18_url = './data/NW2018.csv'
@@ -50,7 +49,7 @@ def data():
     stats = data.describe()
     stats = stats.transpose()
     data = normalize(data, stats)
-    
+
     resample_ds = data.resample(TIMESTEP).mean()
 
     train_ds = resample_ds.sample(frac=0.7)
@@ -77,10 +76,10 @@ def data():
 def model(X_train, X_test, y_train, y_test):
 
     model = tf.keras.models.Sequential()
-    model.add(LSTM(units=200, input_shape=X_train.shape[-2:]))
-    model.add(Dropout(0.41))
+    model.add(LSTM(units={{choice([100, 200, 500])}}, input_shape=X_train.shape[-2:]))
+    model.add(Dropout({{uniform(0, 1)}}))
     model.add(Dense(1))
-    model.add(Activation('relu'))
+    model.add(Activation({{choice(['relu', 'sigmoid', 'tanh'])}}))
     model.compile(optimizer='adam',
                        metrics=['mae', 'mse'], loss='mse')
     early_stopping = EarlyStopping(monitor='val_loss', patience=4)
@@ -88,57 +87,23 @@ def model(X_train, X_test, y_train, y_test):
                                    verbose=1,
                                    save_best_only=True)
     model.fit(X_train, y_train,
-              batch_size=64,
-              epochs=200,
+              batch_size={{choice([32, 64, 128])}},
+              epochs={{choice([100, 200, 500, 1000])}},
               validation_split=0.08,
               callbacks=[early_stopping, checkpointer])
     
     loss, mae, mse  = model.evaluate(X_test, y_test, verbose=0)
 
-    print(' mae:', mae)
-    print(' mse:', mse)
-    print(' loss:', loss)
-    return model
+    print('Test mae:', mae)
+    print('Test mse:', mse)
+    return {'loss': loss, 'status': STATUS_OK, 'model': model}
 
 
 if __name__ == '__main__':
-    X_train, X_test, y_train, y_test = data()
-    lstm_model = model(X_train, X_test, y_train, y_test)
-    predictions = lstm_model.predict(X_test, verbose = 0)
-
-    # MODEL PREDICTION STAGE ------------------------------------------------------------------------------------------------------------------------
-    predictions = lstm_model.predict(X_test, verbose = 0)
-
-    Y_td_test = Y_td_test.reshape(Y_td_test.shape[0], FUTURE_TARGET,)
-
-    predict_list = []
-    test_list = []
-
-    for i in predictions:
-        predict_list.append(i[40])
-
-    pred_array = np.array(predict_list)
-    print(pred_array.shape)
-
-    for i in Y_td_test:
-        test_list.append(i[40])
-
-    val_narray = np.array(test_list)
-    print(val_narray.shape)
-
-    a = plt.axes(aspect='equal')
-    plt.scatter(val_narray, pred_array)
-    plt.xlabel('True Values temperature')
-    plt.ylabel('Predictions temperature')
-    lims = [0, 50]
-    plt.xlim(lims)
-    plt.ylim(lims)
-    _ = plt.plot(lims, lims)
-
-    plt.show()
-    
-    error = pred_array - val_narray
-    print(error)
-    plt.hist(error, bins = 25)
-    plt.xlabel("Prediction Error temperature")
-    _ = plt.ylabel("Count")
+    best_run, best_model = optim.minimize(model=model,
+                                          data=data,
+                                          algo=tpe.suggest,
+                                          max_evals=10,
+                                          trials=Trials())
+    print(best_run)
+    print(best_model)

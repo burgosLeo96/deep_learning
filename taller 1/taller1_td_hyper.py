@@ -39,14 +39,14 @@ def data():
     HISTORY_LAG = 100
     FUTURE_TARGET = 50
     nw_16_url = './data/NW2016.csv'
-    #nw_17_url = './data/NW2017.csv'
-    #nw_18_url = './data/NW2018.csv'
+    nw_17_url = './data/NW2017.csv'
+    nw_18_url = './data/NW2018.csv'
 
     NW2016_dataset = pd.read_csv(nw_16_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
-    #NW2017_dataset = pd.read_csv(nw_17_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
-    #NW2018_dataset = pd.read_csv(nw_18_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
+    NW2017_dataset = pd.read_csv(nw_17_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
+    NW2018_dataset = pd.read_csv(nw_18_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
     
-    #data = pd.concat([NW2016_dataset, NW2017_dataset, NW2018_dataset])
+    data = pd.concat([NW2016_dataset, NW2017_dataset, NW2018_dataset])
     data = NW2016_dataset
     data = data[data.isna()['psl'] == False]
     #Drop useless columns

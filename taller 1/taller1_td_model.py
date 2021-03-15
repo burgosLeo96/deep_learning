@@ -22,15 +22,11 @@ from hyperas import optim
 
 from functions import segment, normalize
 
-DENSE_NEURONS = 64
-LEARNING_RATE = 0.01
-NN_ARCHITECTURE = 0
-EPOCHS = [500, 1000, 2000, 4000, 6000]
+TIMESTEP = '720T'
+HISTORY_LAG = 100
+FUTURE_TARGET = 50
 
 def data():
-    TIMESTEP = '720T'
-    HISTORY_LAG = 100
-    FUTURE_TARGET = 50
     nw_16_url = './data/NW2016.csv'
     nw_17_url = './data/NW2017.csv'
     nw_18_url = './data/NW2018.csv'
@@ -109,3 +105,40 @@ if __name__ == '__main__':
     X_train, X_test, y_train, y_test = data()
     lstm_model = model(X_train, X_test, y_train, y_test)
     predictions = lstm_model.predict(X_test, verbose = 0)
+
+    # MODEL PREDICTION STAGE ------------------------------------------------------------------------------------------------------------------------
+    predictions = lstm_model.predict(X_test, verbose = 0)
+
+    Y_td_test = Y_td_test.reshape(Y_td_test.shape[0], FUTURE_TARGET,)
+
+    predict_list = []
+    test_list = []
+
+    for i in predictions:
+        predict_list.append(i[40])
+
+    pred_array = np.array(predict_list)
+    print(pred_array.shape)
+
+    for i in Y_td_test:
+        test_list.append(i[40])
+
+    val_narray = np.array(test_list)
+    print(val_narray.shape)
+
+    a = plt.axes(aspect='equal')
+    plt.scatter(val_narray, pred_array)
+    plt.xlabel('True Values temperature')
+    plt.ylabel('Predictions temperature')
+    lims = [0, 50]
+    plt.xlim(lims)
+    plt.ylim(lims)
+    _ = plt.plot(lims, lims)
+
+    plt.show()
+    
+    error = pred_array - val_narray
+    print(error)
+    plt.hist(error, bins = 25)
+    plt.xlabel("Prediction Error temperature")
+    _ = plt.ylabel("Count")
