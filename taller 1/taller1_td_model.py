@@ -21,13 +21,6 @@ from hyperopt import Trials, STATUS_OK, tpe
 from hyperas import optim
 
 from functions import segment, normalize
-#dd	Wind direction	degrees (°)
-#ff	Wind speed	m.s-1
-#precip	Precipitation during the reporting period	kg.m2
-#hu	Humidity	percentage (%)
-#td	Dew point	Kelvin (K)
-#t	Temperature	Kelvin (K)
-#psl	Pressure reduced to sea level	Pascal (Pa)
 
 DENSE_NEURONS = 64
 LEARNING_RATE = 0.01
@@ -39,14 +32,14 @@ def data():
     HISTORY_LAG = 100
     FUTURE_TARGET = 50
     nw_16_url = './data/NW2016.csv'
-    #nw_17_url = './data/NW2017.csv'
-    #nw_18_url = './data/NW2018.csv'
+    nw_17_url = './data/NW2017.csv'
+    nw_18_url = './data/NW2018.csv'
 
     NW2016_dataset = pd.read_csv(nw_16_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
-    #NW2017_dataset = pd.read_csv(nw_17_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
-    #NW2018_dataset = pd.read_csv(nw_18_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
+    NW2017_dataset = pd.read_csv(nw_17_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
+    NW2018_dataset = pd.read_csv(nw_18_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
     
-    #data = pd.concat([NW2016_dataset, NW2017_dataset, NW2018_dataset])
+    data = pd.concat([NW2016_dataset, NW2017_dataset, NW2018_dataset])
     data = NW2016_dataset
     data = data[data.isna()['psl'] == False]
     #Drop useless columns
@@ -61,6 +54,7 @@ def data():
     stats = data.describe()
     stats = stats.transpose()
     data = normalize(data, stats)
+    
     resample_ds = data.resample(TIMESTEP).mean()
 
     train_ds = resample_ds.sample(frac=0.7)
