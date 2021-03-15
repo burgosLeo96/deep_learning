@@ -11,164 +11,104 @@ import csv
 
 from tensorflow import keras
 from tensorflow.keras import layers
-
-from keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.models import Sequential
+from hyperas import optim
+from tensorflow.python.keras.layers.recurrent import LSTM
+from tensorflow.python.keras.layers import Input, Dense, Dropout, Activation
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from hyperas.distributions import choice, uniform
 from hyperopt import Trials, STATUS_OK, tpe
 from hyperas import optim
 
-#dd	Wind direction	degrees (°)
-#ff	Wind speed	m.s-1
-#precip	Precipitation during the reporting period	kg.m2
-#hu	Humidity	percentage (%)
-#td	Dew point	Kelvin (K)
-#t	Temperature	Kelvin (K)
-#psl	Pressure reduced to sea level	Pascal (Pa)
+from functions import segment, normalize
 
-def create_model(X_precip_train, Y_precip_train, X_precip_test, Y_precip_test):
-    # MODEL TRAINING STAGE ------------------------------------------------------------------------------------------------------------------------
-
-    lstm_model = tf.keras.models.Sequential([
-        tf.keras.layers.LSTM({{choice([100])}}, input_shape=X_precip_train.shape[-2:]),
-        tf.keras.layers.Dropout({{uniform(0, 1)}}),
-        tf.keras.layers.Dense({{choice([50])}})
-    ])
-
-    lstm_model.compile(
-        optimizer={{choice(['rmsprop', 'adam', 'sgd'])}},
-        metrics=['mae', 'mse', 'accuracy'], loss='mse'
-    )
-
-    #print('Now starting to train!')
-    tmstmp1 = time.time()
-
-    lstm_model.fit(
-    X_precip_train, 
-    Y_precip_train,
-    batch_size={{choice([32, 64, 128])}},
-    epochs={{choice[500, 1000, 2000]}}, 
-    verbose = 0)
-
-    tmstmp2 = time.time()
-    print('Total time elapsed = ', tmstmp2 - tmstmp1)
-
-    # MODEL EVALUATION STAGE ------------------------------------------------------------------------------------------------------------------------
-    loss, mae, mse, accuracy = lstm_model.evaluate(X_precip_train, Y_precip_train, verbose=2)
-
-    print("Loss: ", loss)
-    print("MAE: ", mae)
-    print("MSE: ", mse)
-    print("Acc: ", accuracy)
-    
-    return lstm_model
+DENSE_NEURONS = 64
+LEARNING_RATE = 0.01
+NN_ARCHITECTURE = 0
+EPOCHS = [500, 1000, 2000, 4000, 6000]
 
 def data():
-    #DATA LOADING ------------------------------------------------------------------------------------------------------------------------
+    TIMESTEP = '720T'
+    HISTORY_LAG = 100
+    FUTURE_TARGET = 50
     nw_16_url = './data/NW2016.csv'
     nw_17_url = './data/NW2017.csv'
     nw_18_url = './data/NW2018.csv'
 
-    print("Started data loading process")
-
     NW2016_dataset = pd.read_csv(nw_16_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
     NW2017_dataset = pd.read_csv(nw_17_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
     NW2018_dataset = pd.read_csv(nw_18_url, header = 0, sep = ',', quotechar= '"', error_bad_lines = False)
-
-    print("Data loaded successfully")
-
-    #DATASET PREPROCESSING ---------------------------------------------------------------------------------------------------------------
-    dataset = pd.concat([NW2016_dataset, NW2017_dataset, NW2018_dataset])
-    dataset = dataset[dataset.isna()['psl'] == False]
-
+    
+    data = pd.concat([NW2016_dataset, NW2017_dataset, NW2018_dataset])
+    data = NW2016_dataset
+    data = data[data.isna()['psl'] == False]
     #Drop useless columns
-    dataset = dataset.drop(columns = ['lat', 'lon', 'height_sta', 'td'], axis = 1)
+    data = data.drop(columns = ['lat', 'lon', 'height_sta'], axis = 1)
 
-    dataset['date'] = pd.to_datetime(dataset['date'], format='%Y%m%d %H:%M')
-    dataset.set_index('date', inplace=True)
-
+    data['date'] = pd.to_datetime(data['date'], format='%Y%m%d %H:%M')
+    data.set_index('date', inplace=True)
+    
     #Interpolate missing values
-    dataset = dataset.interpolate(method='linear')
+    data = data.interpolate(method='linear')
 
-    stats = dataset.describe()
+    stats = data.describe()
     stats = stats.transpose()
+    data = normalize(data, stats)
 
-    dataset = (dataset - stats['mean']) / stats['std']
-
-    # DATASET SEGMENTATION ------------------------------------------------------------------------------------------------------------------------
-
-    resample_ds = dataset.resample('720T').mean()
+    resample_ds = data.resample(TIMESTEP).mean()
 
     train_ds = resample_ds.sample(frac=0.7)
     test_ds = resample_ds.drop(train_ds.index)
 
-    #window = {{choice([100])}}
-    #future = {{choice([50])}}
+    X_train, y_train = segment(train_ds, "precip", window = HISTORY_LAG, future = FUTURE_TARGET)
+    X_train = X_train.reshape(X_train.shape[0], HISTORY_LAG, 1)
+    y_train = y_train.reshape(y_train.shape[0], FUTURE_TARGET, 1)
 
-    window = 100
-    future = 50
+    X_test, y_test = segment(train_ds, "precip", window = HISTORY_LAG, future = FUTURE_TARGET)
+    X_test = X_test.reshape(X_test.shape[0], HISTORY_LAG, 1)
+    y_test = y_test.reshape(y_test.shape[0], FUTURE_TARGET,)
 
-    print("Started data segmentation")
-
-    data_train = []
-    labels_train = []
-    for i in range(len(train_ds)):
-        start_index = i
-        end_index = i + window
-        future_index = i + window + future
-        if future_index >= len(train_ds):
-            break
-        data_train.append(train_ds['precip'][i:end_index])
-        labels_train.append(train_ds['precip'][end_index:future_index])
-
-    X_precip_train = np.array(data_train)
-    Y_precip_train = np.array(labels_train)
-
-    X_precip_train = X_precip_train.reshape(X_precip_train.shape[0], window, 1)
-    Y_precip_train = Y_precip_train.reshape(Y_precip_train.shape[0], future, 1)
-
-    data_test = []
-    labels_test = []
-    for i in range(len(test_ds)):
-        start_index = i
-        end_index = i + window
-        future_index = i + window + future
-        if future_index >= len(test_ds):
-            break
-        data_test.append(test_ds['precip'][i:end_index])
-        labels_test.append(test_ds['precip'][end_index:future_index])
-
-    X_precip_test = np.array(data_test)
-    Y_precip_test = np.array(labels_test)
-
-    X_precip_test = X_precip_test.reshape(X_precip_test.shape[0], window, 1)
-    Y_precip_test = Y_precip_test.reshape(Y_precip_test.shape[0], future, 1)
-
-    print(len(X_precip_train), 'train sequences')
-    print(len(X_precip_test), 'test sequences')
+    print(len(X_train), 'train sequences')
+    print(len(X_test), 'test sequences')
 
     
-    print('X_train shape:', X_precip_train.shape)
-    print('X_test shape:', X_precip_test.shape)
+    print('X_train shape:', X_train.shape)
+    print('X_test shape:', X_test.shape)
 
-    return X_precip_train, Y_precip_train, X_precip_test, Y_precip_test
+    return X_train, X_test, y_train, y_test
 
-def main():
-    #Assign some initial values to the hyperparams
-    TIMESTEP = '720T'
-    HISTORY_LAG = 100
-    DENSE_NEURONS = 64
-    LEARNING_RATE = 0.01
-    FUTURE_TARGET = 50
-    EPOCHS = [500, 1000, 2000]
-    NN_ARCHITECTURE = 0
+#Model the NN
+def model(X_train, X_test, y_train, y_test):
 
-    best_run, best_model = optim.minimize(
-        data=data,
-        model=create_model,
-        algo=tpe.suggest,
-        max_evals=10,
-        trials = Trials())
+    model = tf.keras.models.Sequential()
+    model.add(LSTM(units={{choice([100, 200, 500])}}, input_shape=X_train.shape[-2:]))
+    model.add(Dropout({{uniform(0, 1)}}))
+    model.add(Dense(1))
+    model.add(Activation({{choice(['relu', 'sigmoid', 'tanh'])}}))
+    model.compile(optimizer='adam',
+                       metrics=['mae', 'mse'], loss='mse')
+    early_stopping = EarlyStopping(monitor='val_loss', patience=4)
+    checkpointer = ModelCheckpoint(filepath='keras_weights.hdf5',
+                                   verbose=1,
+                                   save_best_only=True)
+    model.fit(X_train, y_train,
+              batch_size={{choice([32, 64, 128])}},
+              epochs={{choice([100, 200, 500, 1000])}},
+              validation_split=0.08,
+              callbacks=[early_stopping, checkpointer])
+    
+    loss, mae, mse  = model.evaluate(X_test, y_test, verbose=0)
 
+    print('Test mae:', mae)
+    print('Test mse:', mse)
+    return {'loss': loss, 'status': STATUS_OK, 'model': model}
+
+
+if __name__ == '__main__':
+    best_run, best_model = optim.minimize(model=model,
+                                          data=data,
+                                          algo=tpe.suggest,
+                                          max_evals=10,
+                                          trials=Trials())
     print(best_run)
-
-main()
+    print(best_model)
