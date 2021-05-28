@@ -5,10 +5,12 @@ __pycache__/
 
 # C extensions
 *.so
-
+*.h5
 # CSV files
 data/
 
+#Taller1
+"taller 1"/
 # Distribution / packaging
 .Python
 build/
