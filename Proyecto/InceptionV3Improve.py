@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
+from keras.applications.inception_resnet_v2 import InceptionResNetV2
 
 df = pd.read_csv('./archive/dataset/train.csv')
 df.head()
@@ -25,7 +26,7 @@ train_generator = datagen.flow_from_dataframe(
 
 
 #Using InceptionV3 pretrained model
-base_model = InceptionV3(include_top=False,weights='imagenet',input_shape=(299,299,3))
+base_model = InceptionResNetV2(include_top=False,weights='imagenet',input_shape=(299,299,3))
 
 base_model.trainable = False
 
