@@ -11,6 +11,8 @@ data/
 
 #Taller1
 "taller 1"/
+#Imagenes
+Proyecto/archive/*
 # Distribution / packaging
 .Python
 build/
