@@ -115,11 +115,17 @@ my_model=Model(inputs=resnet.input,outputs=fc1)
 
 print(my_model.summary())
 from keras.optimizers import Adam
+from keras import layers,models
 adam=Adam(learning_rate=0.0001)
 
 for l in my_model.layers[:-5]:
     #print(l)
     l.trainable = False
+my_model.add(layers.Dense(512,activation='relu'))
+my_model.add(layers.Dropout(0.5))
+my_model.add(layers.Dense(256,activation='relu'))
+my_model.add(layers.Dense(6,activation='softmax'))
+
 my_model.compile(optimizer='adam',loss ="categorical_crossentropy",metrics=["accuracy"])
 
 r = my_model.fit_generator(train_generator,steps_per_epoch=5176//128,validation_data=valid_generator,validation_steps=1293//128,epochs=2)
