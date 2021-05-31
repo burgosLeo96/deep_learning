@@ -12,7 +12,7 @@ import numpy as np
 from glob import glob
 import matplotlib.pyplot as plt
 import pandas as pd
-
+from keras.applications.inception_v3 import InceptionV3
 
 df = pd.read_csv("./archive/dataset/train.csv")
 
@@ -77,7 +77,7 @@ validation_set = validation_datagen.flow_from_dataframe(dataframe=valid_df, dire
                                                  target_size=(299,299), batch_size=32)
 
 #Getting The InceptionResNetV2 Model
-incep = InceptionResNetV2(input_shape=image_size + [3], weights='imagenet', include_top=False)
+incep = InceptionV3(input_shape=image_size + [3], weights='imagenet', include_top=False)
 
 # don't train existing weights
 for layer in incep.layers:
