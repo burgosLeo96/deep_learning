@@ -35,8 +35,6 @@ from keras import layers,models
 model = models.Sequential()
 model.add(base_model)
 model.add(layers.GlobalAveragePooling2D())
-model.add(layers.Dense(768,activation='relu'))
-model.add(layers.Dropout(0.5))
 model.add(layers.Dense(512,activation='relu'))
 model.add(layers.Dropout(0.5))
 model.add(layers.Dense(256,activation='relu'))
@@ -51,7 +49,7 @@ model.compile(
 train_steps = np.ceil(train_generator.n/train_generator.batch_size)
 
 
-model.fit(
+r = model.fit(
     train_generator,
     epochs=12,
     batch_size=32,
