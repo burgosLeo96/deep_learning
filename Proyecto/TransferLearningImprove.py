@@ -118,7 +118,7 @@ from keras.optimizers import Adam
 from keras import layers,models
 adam=Adam(learning_rate=0.0001)
 
-for l in my_model.layers[:-4]:
+for l in my_model.layers[:-5]:
     #print(l)
     l.trainable = False
 

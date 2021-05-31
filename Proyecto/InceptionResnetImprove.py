@@ -77,19 +77,7 @@ validation_set = validation_datagen.flow_from_dataframe(dataframe=valid_df, dire
                                                  target_size=(299,299), batch_size=32)
 
 #Getting The InceptionResNetV2 Model
-base_model = InceptionResNetV2(input_shape=image_size + [3], weights='imagenet', include_top=False)
-
-#Add some extra layers to pretrain model to see if this improve 
-from keras import layers,models
-incep = models.Sequential()
-incep.add(base_model)
-incep.add(layers.GlobalAveragePooling2D())
-incep.add(layers.Dense(512,activation='relu'))
-incep.add(layers.Dropout(0.5))
-incep.add(layers.Dense(256,activation='relu'))
-incep.add(layers.Dense(6,activation='softmax'))
-
-
+incep = InceptionResNetV2(input_shape=image_size + [3], weights='imagenet', include_top=False)
 
 # don't train existing weights
 for layer in incep.layers:
@@ -119,7 +107,7 @@ model.compile(
 r = model.fit(
   training_set,
   validation_data=validation_set,
-  epochs=12,
+  epochs=10,
   steps_per_epoch=training_set.n//32,
   validation_steps=validation_set.n//32
 )
