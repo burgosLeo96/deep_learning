@@ -122,25 +122,9 @@ for l in my_model.layers[:-5]:
     l.trainable = False
 my_model.compile(optimizer='adam',loss ="categorical_crossentropy",metrics=["accuracy"])
 
-r = my_model.fit_generator(train_generator,steps_per_epoch=5176//128,validation_data=valid_generator,validation_steps=1293//128,epochs=2)
+my_model.fit_generator(train_generator,steps_per_epoch=5176//128,validation_data=valid_generator,validation_steps=1293//128,epochs=2)
 
 my_model.save('model.h5')
-
-#Ploting Loss ansd Accuracy
-
-# Loss
-plt.plot(r.history['loss'], label='train loss')
-plt.plot(r.history['val_loss'], label='val loss')
-plt.legend()
-plt.show()
-plt.savefig('LossVal_loss_TransferLearning')
-
-# Accuracies
-plt.plot(r.history['accuracy'], label='train acc')
-plt.plot(r.history['val_accuracy'], label='val acc')
-plt.legend()
-plt.show()
-plt.savefig('AccVal_acc_TransferLearning')
 
 import os
 name=[]
