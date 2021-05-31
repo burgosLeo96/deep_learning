@@ -107,7 +107,7 @@ model.compile(
 r = model.fit(
   training_set,
   validation_data=validation_set,
-  epochs=10,
+  epochs=6,
   steps_per_epoch=training_set.n//32,
   validation_steps=validation_set.n//32
 )
