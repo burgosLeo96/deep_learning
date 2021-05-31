@@ -111,36 +111,23 @@ resnet=NASNetLarge(include_top=True,weights='imagenet')
 x=resnet.layers[-2].output
 fc1=Dense(6,activation='softmax')(x)
 
-model=Model(inputs=resnet.input,outputs=fc1)
+my_model=Model(inputs=resnet.input,outputs=fc1)
 
-print(model.summary())
+print(my_model.summary())
 from keras.optimizers import Adam
 from keras import layers,models
 adam=Adam(learning_rate=0.0001)
 
-for l in model.layers[:-5]:
+for l in my_model.layers[:-4]:
     #print(l)
     l.trainable = False
 
-
-model.compile(optimizer='adam',loss ="categorical_crossentropy",metrics=["accuracy"])
-
-model.save('model.h5')
-
-
-
-prev_model = models.load_model('model.h5') # loading the previously saved model.
-
-my_model = tf.keras.Sequential()
-my_model.add(prev_model)
-my_model.add(layers.Dense(512,activation='relu'))
-my_model.add(layers.Dropout(0.5))
-my_model.add(layers.Dense(256,activation='relu'))
-my_model.add(layers.Dense(6,activation='softmax'))
-
 my_model.compile(optimizer='adam',loss ="categorical_crossentropy",metrics=["accuracy"])
 
-my_model.fit_generator(train_generator,steps_per_epoch=5176//128,validation_data=valid_generator,validation_steps=1293//128,epochs=2)
+r = my_model.fit_generator(train_generator,steps_per_epoch=5176//128,validation_data=valid_generator,validation_steps=1293//128,epochs=4)
+
+my_model.save('model.h5')
+
 import os
 name=[]
 y_pred=[]
